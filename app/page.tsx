@@ -219,7 +219,7 @@ export default function SuggestionsBoard() {
 
           <div className="flex flex-col text-left">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-              AAPARC Public Forum
+              APARC Public Forum
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
               Share your ideas and feedback for administrative reforms in Arunachal Pradesh.
@@ -274,7 +274,7 @@ export default function SuggestionsBoard() {
                 disabled={(!newPostContent.trim() && !selectedFile) || isUploading}
                 className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-medium transition-colors"
               >
-                {isUploading ? 'Submitting...' : 'Submit to AAPARC'}
+                {isUploading ? 'Submitting...' : 'Submit to APARC'}
               </button>
             </div>
           </form>
