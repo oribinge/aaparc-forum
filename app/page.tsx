@@ -219,7 +219,7 @@ export default function SuggestionsBoard() {
 
           <div className="flex flex-col text-left">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-              APARC Public Forum
+              APARC Public Forum.
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
               Share your ideas and feedback for administrative reforms in Arunachal Pradesh.
