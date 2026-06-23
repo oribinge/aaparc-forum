@@ -3,18 +3,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase'; 
 
-// --- Helper: Format Date ---
+// --- Helper: Format Date & Time ---
 const formatRelativeTime = (isoString: string) => {
   const date = new Date(isoString);
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
 };
 
-// --- Types ---
 type Comment = {
   id: string;
   post_id: string;
@@ -29,14 +29,14 @@ type Post = {
   category: string;
   content: string;
   created_at: string;
-  upvotes: number; // Treated as Likes
-  downvotes: number; // Treated as Dislikes
+  upvotes: number; 
+  downvotes: number; 
   comments: Comment[];
   media_url?: string;
   media_type?: string;
+  contact_name?: string;
 };
 
-// --- CATEGORIES ---
 const CATEGORIES = [
   'Public Service Delivery', 
   'Governance & Transparency', 
@@ -52,6 +52,12 @@ export default function SuggestionsBoard() {
   const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // --- NEW: Contact Info States ---
+  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +65,6 @@ export default function SuggestionsBoard() {
   const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
-  
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down'>>({});
 
   useEffect(() => {
@@ -101,18 +106,30 @@ export default function SuggestionsBoard() {
       mediaType = selectedFile.type.split('/')[0];
     }
 
+    // Determine the public author name. 
+    // If they provided a name, show it! Otherwise, stay anonymous.
+    const publicAuthorName = isAnonymous ? 'Anonymous Citizen' : (contactName.trim() || 'Citizen');
+
     const { data } = await supabase.from('posts').insert([{
-      author: 'Citizen', 
+      author: publicAuthorName, 
       category: selectedCategory,
       content: newPostContent,
       media_url: mediaUrl,
       media_type: mediaType,
+      contact_name: isAnonymous ? null : contactName,
+      contact_email: isAnonymous ? null : contactEmail,
+      contact_phone: isAnonymous ? null : contactPhone
     }]).select();
 
     if (data) {
       setPosts([{ ...data[0], comments: [] }, ...posts]); 
       setNewPostContent('');
       setSelectedFile(null);
+      // Reset the form
+      setContactName('');
+      setContactEmail('');
+      setContactPhone('');
+      setIsAnonymous(true); 
     }
     setIsUploading(false);
   };
@@ -202,168 +219,253 @@ export default function SuggestionsBoard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-[#f1f5f9] text-slate-900 font-sans">
       
-      {/* HEADER WITH OFFICIAL SEAL */}
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 py-5 flex items-center gap-4 sm:gap-6">
-          
+      <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-white to-green-600"></div>
+
+      <header className="bg-white border-b-2 border-blue-900 shadow-sm sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center gap-4 md:gap-6">
           <div className="flex-shrink-0">
-            {/* UPDATED IMAGE SOURCE */}
             <img 
               src="/Arunachal_Pradesh_Seal.svg.png" 
               alt="Seal of Arunachal Pradesh" 
-              className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-sm"
+              className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-sm"
             />
           </div>
-
-          <div className="flex flex-col text-left">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-              APARC Public Forum.
+          <div className="text-center md:text-left">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-[#003366] uppercase tracking-wide">
+              Arunachal Pradesh
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-              Share your ideas and feedback for administrative reforms in Arunachal Pradesh.
+            <h2 className="text-lg md:text-xl font-bold text-slate-800">
+              Administrative Reforms Commission (APARC)
+            </h2>
+            <p className="text-sm text-slate-500 mt-1 font-medium">
+              Public Suggestion & Feedback Portal
             </p>
           </div>
-
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-10">
         
-        {/* SUBMIT SUGGESTION FORM */}
-        <section className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <form onSubmit={handlePostSubmit}>
+        {/* --- FORM SECTION --- */}
+        <section className="bg-white border border-slate-300 shadow-sm">
+          <div className="bg-[#003366] px-5 py-3">
+            <h3 className="text-white font-semibold uppercase tracking-wider text-sm">
+              Submit Official Feedback
+            </h3>
+          </div>
+          
+          <form onSubmit={handlePostSubmit} className="p-5">
+            
+            {/* NEW IDENTITY SECTION */}
+            <div className="mb-6 bg-slate-50 border border-slate-200 p-4">
+              <label className="block text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">Identity Preferences</label>
+              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                <label className="flex items-center gap-2 cursor-pointer bg-white border border-slate-300 px-4 py-2 hover:bg-slate-50 transition-colors">
+                  <input 
+                    type="radio" 
+                    checked={isAnonymous} 
+                    onChange={() => setIsAnonymous(true)} 
+                    className="w-4 h-4 text-[#003366] accent-[#003366]" 
+                  />
+                  <span className="text-sm font-bold text-slate-800">Stay Anonymous</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer bg-white border border-slate-300 px-4 py-2 hover:bg-slate-50 transition-colors">
+                  <input 
+                    type="radio" 
+                    checked={!isAnonymous} 
+                    onChange={() => setIsAnonymous(false)} 
+                    className="w-4 h-4 text-[#003366] accent-[#003366]" 
+                  />
+                  <span className="text-sm font-bold text-slate-800">Provide Contact Info (Optional)</span>
+                </label>
+              </div>
+
+              {!isAnonymous && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Full Name</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. John Doe"
+                      className="w-full bg-white border border-slate-300 p-2.5 text-sm outline-none focus:border-[#003366] focus:ring-1 focus:ring-[#003366]"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Email</label>
+                    <input 
+                      type="email" 
+                      placeholder="e.g. citizen@gmail.com"
+                      className="w-full bg-white border border-slate-300 p-2.5 text-sm outline-none focus:border-[#003366] focus:ring-1 focus:ring-[#003366]"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Phone Number</label>
+                    <input 
+                      type="tel" 
+                      placeholder="+91"
+                      className="w-full bg-white border border-slate-300 p-2.5 text-sm outline-none focus:border-[#003366] focus:ring-1 focus:ring-[#003366]"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                    />
+                  </div>
+                  <p className="md:col-span-3 text-[11px] text-slate-500 font-medium">
+                    * Your Name will be displayed publicly, but your email and phone number will remain strictly confidential for APARC administrative use only.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <label className="block text-sm font-bold text-slate-700 mb-2">Category of Reform</label>
+            <select 
+              className="w-full md:w-1/2 bg-slate-50 border border-slate-300 text-slate-800 text-sm p-2.5 mb-4 outline-none focus:border-[#003366] focus:ring-1 focus:ring-[#003366] transition-all"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              {CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+
+            <label className="block text-sm font-bold text-slate-700 mb-2">Detailed Suggestion</label>
             <textarea
-              className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-4 outline-none focus:border-indigo-500 transition-colors resize-none placeholder:text-slate-400"
-              rows={4}
-              placeholder="Detail your idea for improving public administration, transparency, or service delivery..."
+              className="w-full bg-slate-50 text-slate-900 border border-slate-300 p-4 outline-none focus:border-[#003366] focus:ring-1 focus:ring-[#003366] transition-all resize-none placeholder:text-slate-400"
+              rows={5}
+              placeholder="Detail your idea for improving public administration, transparency, or service delivery in Arunachal Pradesh..."
               value={newPostContent}
               onChange={(e) => setNewPostContent(e.target.value)}
             />
             
             {selectedFile && (
-              <div className="mt-3 bg-slate-100 text-sm px-3 py-2 rounded-md flex justify-between items-center border border-slate-200">
-                <span className="truncate text-slate-700">📎 {selectedFile.name}</span>
-                <button type="button" onClick={() => setSelectedFile(null)} className="text-rose-500 hover:text-rose-600 font-medium">
-                  Remove
+              <div className="mt-3 bg-blue-50 border border-blue-200 text-blue-800 text-sm px-4 py-2 flex justify-between items-center">
+                <span className="truncate font-medium">📎 {selectedFile.name}</span>
+                <button type="button" onClick={() => setSelectedFile(null)} className="text-rose-600 hover:text-rose-800 font-bold ml-4">
+                  REMOVE
                 </button>
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <select 
-                  className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg px-3 py-2 outline-none focus:border-indigo-500 max-w-[200px]"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                >
-                  {CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-5 pt-4 border-t border-slate-200">
+              <div className="flex items-center gap-3">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*,audio/*,application/pdf" />
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm transition-colors border border-slate-200">
-                  📎 Attach Media
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 text-sm font-semibold transition-colors border border-slate-300 shadow-sm">
+                  📎 Attach Document / Media
                 </button>
               </div>
 
               <button 
                 type="submit"
                 disabled={(!newPostContent.trim() && !selectedFile) || isUploading}
-                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-medium transition-colors"
+                className="w-full sm:w-auto bg-[#003366] hover:bg-blue-800 disabled:opacity-50 text-white px-8 py-2.5 font-bold uppercase tracking-wider transition-colors shadow-sm"
               >
-                {isUploading ? 'Submitting...' : 'Submit to APARC'}
+                {isUploading ? 'Submitting...' : 'Submit to Commission'}
               </button>
             </div>
           </form>
         </section>
 
-        {/* FEED SECTION */}
+        {/* --- PUBLIC FEED --- */}
         <section className="space-y-6">
+          <div className="flex items-center gap-3 border-b-2 border-slate-300 pb-2">
+            <h3 className="text-xl font-bold text-[#003366] uppercase tracking-wide">Public Submissions</h3>
+            <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2 py-1 rounded-full">{posts.length}</span>
+          </div>
+
           {isLoading ? (
-            <div className="text-center text-slate-500 py-10">Loading citizen suggestions...</div>
+            <div className="text-center text-slate-500 py-10 font-medium">Retrieving records from database...</div>
           ) : posts.length === 0 ? (
-            <div className="text-center text-slate-500 py-10">No public suggestions yet. Be the first to share your ideas for reform!</div>
+            <div className="text-center text-slate-500 py-10 font-medium">No public suggestions have been submitted yet.</div>
           ) : (
             posts.map(post => (
-              <article key={post.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <article key={post.id} className="bg-white border border-slate-300 shadow-sm relative">
                 
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                <div className="bg-slate-100 border-b border-slate-200 px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-[11px] font-extrabold uppercase tracking-widest text-white bg-[#003366] px-2.5 py-1">
                       {post.category}
                     </span>
-                    <span className="text-sm font-medium text-slate-600">{post.author}</span>
+                    <span className="text-sm font-bold text-slate-700">Submitted by: {post.author}</span>
                   </div>
-                  <span className="text-xs text-slate-400">{formatRelativeTime(post.created_at)}</span>
+                  {/* NEW: EXACT DATE AND TIME BADGE ON PUBLIC FEED */}
+                  <span className="text-xs font-bold text-[#003366] bg-blue-50 px-2 py-1 border border-blue-100 flex items-center gap-1">
+                    ⏱️ Uploaded: {formatRelativeTime(post.created_at)}
+                  </span>
                 </div>
 
-                <p className="text-slate-800 text-lg leading-relaxed mb-4 whitespace-pre-wrap">{post.content}</p>
+                <div className="p-5">
+                  <p className="text-slate-800 text-base leading-relaxed mb-5 whitespace-pre-wrap">{post.content}</p>
 
-                {post.media_url && post.media_type === 'image' && <img src={post.media_url} alt="Citizen upload" className="w-full max-h-[500px] object-cover rounded-lg mb-4 border border-slate-200" />}
-                {post.media_url && post.media_type === 'video' && <video src={post.media_url} controls className="w-full max-h-[500px] rounded-lg mb-4 border border-slate-200" />}
-                {post.media_url && post.media_type === 'audio' && <audio src={post.media_url} controls className="w-full mb-4 outline-none" />}
+                  {/* MEDIA DISPLAY */}
+                  {post.media_url && post.media_type === 'image' && <img src={post.media_url} alt="Attached Document" className="w-full max-h-[400px] object-cover border border-slate-300 p-1 mb-5" />}
+                  {post.media_url && post.media_type === 'video' && <video src={post.media_url} controls className="w-full max-h-[400px] border border-slate-300 p-1 mb-5" />}
+                  {post.media_url && post.media_type === 'audio' && <audio src={post.media_url} controls className="w-full mb-5" />}
 
-                {/* LIKE / DISLIKE BUTTONS */}
-                <div className="flex items-center gap-4 border-t border-slate-100 pt-4">
-                  
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => handleVote(post, 'up')} 
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors ${
-                        userVotes[post.id] === 'up' 
-                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      👍 <span className="text-sm font-medium">{post.upvotes}</span>
-                    </button>
+                  <div className="flex items-center gap-4 pt-4 border-t border-slate-200">
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleVote(post, 'up')} 
+                        className={`flex items-center gap-1.5 px-3 py-1.5 border transition-all text-sm font-bold ${
+                          userVotes[post.id] === 'up' 
+                            ? 'bg-blue-50 border-[#003366] text-[#003366]' 
+                            : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        👍 Endorse <span className="ml-1 bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded text-xs">{post.upvotes}</span>
+                      </button>
+                      
+                      <button 
+                        onClick={() => handleVote(post, 'down')} 
+                        className={`flex items-center gap-1.5 px-3 py-1.5 border transition-all text-sm font-bold ${
+                          userVotes[post.id] === 'down' 
+                            ? 'bg-rose-50 border-rose-600 text-rose-700' 
+                            : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        👎 Object <span className="ml-1 bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded text-xs">{post.downvotes}</span>
+                      </button>
+                    </div>
                     
-                    <button 
-                      onClick={() => handleVote(post, 'down')} 
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors ${
-                        userVotes[post.id] === 'down' 
-                          ? 'bg-rose-50 border-rose-200 text-rose-700' 
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      👎 <span className="text-sm font-medium">{post.downvotes}</span>
+                    <button onClick={() => toggleComments(post.id)} className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#003366] transition-colors ml-auto uppercase tracking-wide">
+                      💬 Discussion ({post.comments.length})
                     </button>
                   </div>
-                  
-                  <button onClick={() => toggleComments(post.id)} className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors ml-auto">
-                    💬 {post.comments.length} Discussion
-                  </button>
                 </div>
 
                 {/* COMMENTS SECTION */}
                 {expandedPosts.has(post.id) && (
-                  <div className="mt-5 pt-5 border-t border-slate-100 space-y-4">
+                  <div className="bg-slate-50 border-t border-slate-200 p-5 space-y-4">
                     
-                    <div className="space-y-3">
-                      {post.comments.map(comment => (
-                        <div key={comment.id} className="bg-slate-50 border border-slate-100 rounded-lg p-3">
-                          <div className="flex justify-between items-start mb-2">
-                            <p className="text-slate-700 text-sm whitespace-pre-wrap">{comment.content}</p>
-                            <span className="text-[10px] text-slate-400 ml-2 whitespace-nowrap">{formatRelativeTime(comment.created_at)}</span>
+                    {post.comments.length > 0 && (
+                      <div className="space-y-3">
+                        {post.comments.map(comment => (
+                          <div key={comment.id} className="bg-white border border-slate-300 p-4 relative">
+                            <div className="flex justify-between items-start mb-2">
+                              <p className="text-slate-800 text-sm whitespace-pre-wrap pr-20">{comment.content}</p>
+                              <span className="text-[11px] text-slate-500 absolute top-4 right-4">{formatRelativeTime(comment.created_at)}</span>
+                            </div>
+                            <button 
+                              onClick={() => handleCommentLike(post.id, comment.id, comment.likes)}
+                              className={`text-xs font-bold flex items-center gap-1 transition-colors mt-2 ${
+                                likedComments.has(comment.id) ? 'text-[#003366]' : 'text-slate-500 hover:text-[#003366]'
+                              }`}
+                            >
+                              👍 Endorse ({comment.likes})
+                            </button>
                           </div>
-                          <button 
-                            onClick={() => handleCommentLike(post.id, comment.id, comment.likes)}
-                            className={`text-xs font-medium flex items-center gap-1 transition-colors ${likedComments.has(comment.id) ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`}
-                          >
-                            👍 {comment.likes}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
                       <input 
                         type="text"
-                        placeholder="Add to the discussion..."
-                        className="flex-1 bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 transition-colors"
+                        placeholder="Add a comment to the public record..."
+                        className="flex-1 bg-white border border-slate-300 p-2.5 text-sm text-slate-900 outline-none focus:border-[#003366] focus:ring-1 focus:ring-[#003366]"
                         value={commentInputs[post.id] || ''}
                         onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleAddComment(post.id); }}
@@ -371,9 +473,9 @@ export default function SuggestionsBoard() {
                       <button 
                         onClick={() => handleAddComment(post.id)}
                         disabled={!commentInputs[post.id]?.trim()}
-                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        className="bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white px-6 py-2.5 text-sm font-bold uppercase tracking-wider transition-colors"
                       >
-                        Send
+                        Submit
                       </button>
                     </div>
 
