@@ -43,7 +43,10 @@ const CATEGORIES = [
   'Policy Reform', 
   'Digital Initiative', 
   'Infrastructure', 
-  'General Feedback'
+  'Issues about structure',
+  'Personnel matters',
+  'Training and capacity-building work',
+  'Any other (please specify)'
 ];
 
 export default function SuggestionsBoard() {
